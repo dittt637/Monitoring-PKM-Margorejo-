@@ -151,32 +151,24 @@ const int JAM_LAMPU_OFF =
     6;
 
 // =====================================================
-// LOGIKA KELEMBAPAN TANAH
+// JADWAL VALVE (RTC)
 // =====================================================
 
-// Kering jika <= 35 persen
-const float BATAS_KERING =
-    35.0;
+// Pagi: jam 7 (07:00)
+const int JAM_VALVE_PAGI =
+    7;
 
-// Basah jika >= 55 persen
-const float BATAS_BASAH =
-    55.0;
+// Sore: jam 4 sore (16:00)
+const int JAM_VALVE_SORE =
+    16;
 
-// Minimal 2 sensor kering
-const uint8_t JUMLAH_KERING_BUKA =
-    2;
+// Durasi valve menyala: 15 menit (07:00 - 07:15 & 16:00 - 16:15)
+const int MENIT_DURASI_VALVE =
+    15;
 
-// Minimal 2 sensor basah
-const uint8_t JUMLAH_BASAH_TUTUP =
-    2;
-
-// Valve maksimal terbuka 10 menit
+// Proteksi batas maksimum valve terbuka sebagai cadangan fail-safe (20 menit)
 const unsigned long MAKSIMUM_WAKTU_VALVE =
-    10UL * 60UL * 1000UL;
-
-// Jeda valve 1 menit
-const unsigned long JEDA_MINIMUM_VALVE =
-    60UL * 1000UL;
+    20UL * 60UL * 1000UL;
 
 // =====================================================
 // KALIBRASI SENSOR KELEMBAPAN TANAH
@@ -701,6 +693,31 @@ bool jadwalLampuNyala(
 }
 
 // =====================================================
+// JADWAL VALVE
+// =====================================================
+
+bool jadwalValveNyala(
+    int jamSekarang,
+    int menitSekarang
+) {
+  if (
+      jamSekarang == JAM_VALVE_PAGI &&
+      menitSekarang < MENIT_DURASI_VALVE
+  ) {
+    return true;
+  }
+
+  if (
+      jamSekarang == JAM_VALVE_SORE &&
+      menitSekarang < MENIT_DURASI_VALVE
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+// =====================================================
 // PEMBACAAN ADC LDR
 // =====================================================
 
@@ -915,60 +932,32 @@ void bacaSensorKelembapan() {
   }
 }
 // =====================================================
-// KONTROL VALVE (VOTING 2 DARI 3: SOIL 1, SOIL 2, NPK)
+// KONTROL VALVE (BERDASARKAN JADWAL RTC)
 // =====================================================
 
 void kontrolValve(unsigned long sekarang) {
-  uint8_t jumlahValid = 0;
-  uint8_t jumlahKering = 0;
-  uint8_t jumlahBasah = 0;
-  // Sensor 1: Soil Analog 1
-  if (soilValid[0]) {
-    jumlahValid++;
-    if (persenSoil[0] <= BATAS_KERING) jumlahKering++;
-    if (persenSoil[0] >= BATAS_BASAH)  jumlahBasah++;
-  }
-  // Sensor 2: Soil Analog 2
-  if (soilValid[1]) {
-    jumlahValid++;
-    if (persenSoil[1] <= BATAS_KERING) jumlahKering++;
-    if (persenSoil[1] >= BATAS_BASAH)  jumlahBasah++;
-  }
-  // Sensor 3: Kelembapan Modbus NPK
-  if (dataNpk.valid && !isnan(dataNpk.kelembapan) && dataNpk.kelembapan >= 0.0 && dataNpk.kelembapan <= 100.0) {
-    jumlahValid++;
-    if (dataNpk.kelembapan <= BATAS_KERING) jumlahKering++;
-    if (dataNpk.kelembapan >= BATAS_BASAH)  jumlahBasah++;
-  }
-  // Pengaman: Minimal harus ada 2 sensor yang valid agar valve bisa bekerja
-  if (jumlahValid < 2) {
+  if (!rtcTerdeteksi) {
     if (valveTerbuka) {
       setValve(false);
       waktuValveBerhenti = sekarang;
     }
     return;
   }
-  // Logika Buka / Tutup Valve
-  if (valveTerbuka) {
-    bool minimalDuaSensorBasah = (jumlahBasah >= JUMLAH_BASAH_TUTUP); // >= 2 sensor basah
-    bool waktuMaksimumTercapai = (sekarang - waktuValveMulai >= MAKSIMUM_WAKTU_VALVE);
-    if (minimalDuaSensorBasah || waktuMaksimumTercapai) {
-      setValve(false);
-      waktuValveBerhenti = sekarang;
-      if (waktuMaksimumTercapai) {
-        valveTimeout = true;
-      }
-    }
-  } else {
-    if (jumlahBasah >= JUMLAH_BASAH_TUTUP) {
-      valveTimeout = false;
-    }
-    bool minimalDuaSensorKering = (jumlahKering >= JUMLAH_KERING_BUKA); // >= 2 sensor kering
-    bool jedaSelesai = (sekarang - waktuValveBerhenti >= JEDA_MINIMUM_VALVE);
-    if (minimalDuaSensorKering && jedaSelesai && !valveTimeout) {
+
+  DateTime now = rtc.now();
+  bool harusBuka = jadwalValveNyala(now.hour(), now.minute());
+
+  if (harusBuka) {
+    if (!valveTerbuka && !valveTimeout) {
       setValve(true);
       waktuValveMulai = sekarang;
     }
+  } else {
+    if (valveTerbuka) {
+      setValve(false);
+      waktuValveBerhenti = sekarang;
+    }
+    valveTimeout = false; // Reset proteksi timeout jika sudah di luar jadwal
   }
 }
 
@@ -2911,7 +2900,7 @@ void loop() {
   }
 
   // ---------------------------------------------------
-  // RTC DAN LAMPU
+  // RTC, LAMPU, DAN VALVE
   // ---------------------------------------------------
 
   if (
@@ -2935,6 +2924,10 @@ void loop() {
     else {
       setLampu(false);
     }
+
+    kontrolValve(
+        sekarang
+    );
   }
 
   // ---------------------------------------------------
@@ -3027,10 +3020,6 @@ void loop() {
         sekarang;
 
     bacaSensorKelembapan();
-
-    kontrolValve(
-        sekarang
-    );
   }
 
   // Proteksi valve maksimum
