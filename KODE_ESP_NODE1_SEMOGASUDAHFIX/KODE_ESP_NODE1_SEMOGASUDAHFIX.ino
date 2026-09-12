@@ -949,29 +949,24 @@ void bacaSensorKelembapan() {
 // KONTROL VALVE (BERDASARKAN JADWAL RTC)
 // =====================================================
 
-void kontrolValve(unsigned long sekarang) {
-  if (!rtcTerdeteksi) {
-    if (valveTerbuka) {
-      setValve(false);
-      waktuValveBerhenti = sekarang;
-    }
-    return;
-  }
-
-  DateTime now = rtc.now();
-  bool harusBuka = jadwalValveNyala(now.hour(), now.minute());
+void kontrolValve(unsigned long sekarang, int jamSekarang, int menitSekarang) {
+  bool harusBuka = jadwalValveNyala(jamSekarang, menitSekarang);
 
   if (harusBuka) {
     if (!valveTerbuka && !valveTimeout) {
+      // Jadwal aktif dan valve belum terbuka: buka sekarang
       setValve(true);
       waktuValveMulai = sekarang;
     }
+    // Jika valve sudah terbuka, biarkan terus terbuka
   } else {
+    // Di luar jadwal: pastikan valve tertutup
     if (valveTerbuka) {
       setValve(false);
       waktuValveBerhenti = sekarang;
     }
-    valveTimeout = false; // Reset proteksi timeout jika sudah di luar jadwal
+    // Reset flag timeout HANYA saat di luar jadwal
+    valveTimeout = false;
   }
 }
 
@@ -2929,19 +2924,28 @@ void loop() {
       DateTime now =
           rtc.now();
 
+      // Gunakan satu pembacaan RTC untuk lampu DAN valve
       setLampu(
           jadwalLampuNyala(
               now.hour()
           )
       );
+
+      kontrolValve(
+          sekarang,
+          now.hour(),
+          now.minute()
+      );
     }
     else {
       setLampu(false);
-    }
 
-    kontrolValve(
-        sekarang
-    );
+      // RTC tidak terdeteksi: pastikan valve tertutup
+      if (valveTerbuka) {
+        setValve(false);
+        waktuValveBerhenti = sekarang;
+      }
+    }
   }
 
   // ---------------------------------------------------
@@ -3036,20 +3040,16 @@ void loop() {
     bacaSensorKelembapan();
   }
 
-  // Proteksi valve maksimum
+  // Proteksi valve fail-safe: jika valve menyala melebihi batas maksimum
+  // (20 menit), tutup paksa. Ini hanya sebagai pengaman terakhir.
   if (
       valveTerbuka &&
-      sekarang -
-      waktuValveMulai >=
-      MAKSIMUM_WAKTU_VALVE
+      sekarang - waktuValveMulai >= MAKSIMUM_WAKTU_VALVE
   ) {
     setValve(false);
-
-    waktuValveBerhenti =
-        sekarang;
-
-    valveTimeout =
-        true;
+    waktuValveBerhenti = sekarang;
+    valveTimeout = true;
+    // valveTimeout akan direset oleh kontrolValve saat jadwal sudah selesai
   }
 
   // ---------------------------------------------------
