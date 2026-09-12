@@ -170,6 +170,10 @@ const int MENIT_DURASI_VALVE =
 const unsigned long MAKSIMUM_WAKTU_VALVE =
     20UL * 60UL * 1000UL;
 
+// Jeda valve 1 menit
+const unsigned long JEDA_MINIMUM_VALVE =
+    60UL * 1000UL;
+
 // =====================================================
 // KALIBRASI SENSOR KELEMBAPAN TANAH
 // =====================================================
