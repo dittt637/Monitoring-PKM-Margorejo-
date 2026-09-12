@@ -154,15 +154,21 @@ const int JAM_LAMPU_OFF =
 // JADWAL VALVE (RTC)
 // =====================================================
 
-// Pagi: jam 7 (07:00)
+// Pagi: jam 7 tepat (07:00)
 const int JAM_VALVE_PAGI =
     7;
 
-// Sore: jam 4 sore (16:00)
+const int MENIT_VALVE_PAGI =
+    0;
+
+// Sore: jam 4 lewat 30 menit (16:30)
 const int JAM_VALVE_SORE =
     16;
 
-// Durasi valve menyala: 15 menit (07:00 - 07:15 & 16:00 - 16:15)
+const int MENIT_VALVE_SORE =
+    30;
+
+// Durasi valve menyala: 15 menit
 const int MENIT_DURASI_VALVE =
     15;
 
@@ -704,16 +710,20 @@ bool jadwalValveNyala(
     int jamSekarang,
     int menitSekarang
 ) {
+  // Pagi: 07:00 - 07:15
   if (
       jamSekarang == JAM_VALVE_PAGI &&
-      menitSekarang < MENIT_DURASI_VALVE
+      menitSekarang >= MENIT_VALVE_PAGI &&
+      menitSekarang < MENIT_VALVE_PAGI + MENIT_DURASI_VALVE
   ) {
     return true;
   }
 
+  // Sore: 16:30 - 16:45
   if (
       jamSekarang == JAM_VALVE_SORE &&
-      menitSekarang < MENIT_DURASI_VALVE
+      menitSekarang >= MENIT_VALVE_SORE &&
+      menitSekarang < MENIT_VALVE_SORE + MENIT_DURASI_VALVE
   ) {
     return true;
   }
