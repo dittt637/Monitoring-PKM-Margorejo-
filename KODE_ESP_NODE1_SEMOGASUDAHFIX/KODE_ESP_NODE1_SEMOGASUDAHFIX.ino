@@ -950,23 +950,10 @@ void bacaSensorKelembapan() {
 // =====================================================
 
 void kontrolValve(unsigned long sekarang, int jamSekarang, int menitSekarang) {
-  bool harusBuka = jadwalValveNyala(jamSekarang, menitSekarang);
-
-  if (harusBuka) {
-    if (!valveTerbuka && !valveTimeout) {
-      // Jadwal aktif dan valve belum terbuka: buka sekarang
-      setValve(true);
-      waktuValveMulai = sekarang;
-    }
-    // Jika valve sudah terbuka, biarkan terus terbuka
-  } else {
-    // Di luar jadwal: pastikan valve tertutup
-    if (valveTerbuka) {
-      setValve(false);
-      waktuValveBerhenti = sekarang;
-    }
-    // Reset flag timeout HANYA saat di luar jadwal
-    valveTimeout = false;
+  // MODE TESTING: VALVE DIPAKSA NYALA TERUS
+  if (!valveTerbuka) {
+    setValve(true);
+    waktuValveMulai = sekarang;
   }
 }
 
@@ -3040,13 +3027,12 @@ void loop() {
     bacaSensorKelembapan();
   }
 
-  // Proteksi valve fail-safe: jika valve menyala melebihi batas maksimum
-  // (20 menit), tutup paksa. Ini hanya sebagai pengaman terakhir.
+  // Proteksi valve fail-safe: dinonaktifkan sementara untuk testing
   if (
       valveTerbuka &&
       sekarang - waktuValveMulai >= MAKSIMUM_WAKTU_VALVE
   ) {
-    setValve(false);
+    // setValve(false); // Dimatikan untuk testing
     waktuValveBerhenti = sekarang;
     valveTimeout = true;
     // valveTimeout akan direset oleh kontrolValve saat jadwal sudah selesai
