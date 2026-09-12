@@ -161,12 +161,12 @@ const int JAM_VALVE_PAGI =
 const int MENIT_VALVE_PAGI =
     0;
 
-// Sore: jam 4 lewat 45 menit (16:45)
+// Sore: jam 5 sore tepat (17:00)
 const int JAM_VALVE_SORE =
-    16;
+    17;
 
 const int MENIT_VALVE_SORE =
-    45;
+    0;
 
 // Durasi valve menyala: 15 menit
 const int MENIT_DURASI_VALVE =
