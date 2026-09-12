@@ -40,8 +40,8 @@ Sistem menggunakan **dua node** berbasis mikrokontroler **ESP32-S3**:
    - **Node 1:** Sistem *voting* 2 dari 3 sensor (Soil 1, Soil 2, dan NPK). Valve terbuka jika minimal 2 sensor mendeteksi kelembapan $\le 35\%$, dan tertutup jika $\ge 55\%$.
    - **Timeout Proteksi:** Valve otomatis dimatikan jika menyala lebih dari 10 menit berturut-turut, dengan jeda minimum antar-siram 1 menit.
 2. **Manajemen Suhu Panel (Kipas):**
-   - **Node 1:** Kipas ON jika suhu panel $\ge 34.0^\circ\text{C}$.
-   - **Node 2:** Kipas ON jika suhu panel $\ge 38.0^\circ\text{C}$.
+   - Kipas menyala otomatis saat suhu panel $\ge 34.0^\circ\text{C}$ selama **5 menit (300.000 ms)**, kemudian mati.
+   - Kipas akan menyala kembali jika suhu menyentuh $34.0^\circ\text{C}$ lagi (setelah suhu sempat turun di bawah $34.0^\circ\text{C}$).
 3. **Penerangan Otomatis (Lampu):**
    - Bekerja otomatis berdasarkan waktu RTC: Menyala pukul 18:00 WIB dan padam pukul 06:00 WIB.
 

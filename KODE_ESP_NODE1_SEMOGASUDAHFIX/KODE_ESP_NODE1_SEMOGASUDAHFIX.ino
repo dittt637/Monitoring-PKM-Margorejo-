@@ -129,13 +129,16 @@ const unsigned long INTERVAL_WIFI_RECONNECT =
 // =====================================================
 
 /*
-  PERBAIKAN:
-  Menggunakan satu batas suhu saja (28 C).
-  Fan ON  jika suhu panel >= 28 C
-  Fan OFF jika suhu panel <  28 C
+  Logika Fan:
+  - Menyala saat suhu panel >= 34 C selama 5 menit, kemudian mati.
+  - Menyala kembali saat suhu menyentuh 34 C lagi (setelah sempat turun di bawah 34 C).
 */
 const float SUHU_KIPAS_ON =
     34.0;
+
+// Durasi kipas menyala: 5 menit (5 x 60 x 1000 = 300000 ms)
+const unsigned long DURASI_KIPAS_NYALA =
+    300000;
 
 // =====================================================
 // JADWAL LAMPU
@@ -407,6 +410,13 @@ IPAddress alamatBroadcast;
 
 // Status relay
 bool kipasNyala =
+    false;
+
+// Waktu dan siklus kipas
+unsigned long waktuKipasMulai =
+    0;
+
+bool kipasSelesaiSiklus =
     false;
 
 bool lampuNyala =
@@ -2868,24 +2878,34 @@ void loop() {
         !isnan(suhuDalam) &&
         !isnan(lembapDalam);
 
-    if (!dhtDalamValid) {
-      setKipas(false);
-    }
-    else {
-      /*
-        PERBAIKAN LOGIKA FAN:
-        Satu batas suhu saja (28 C).
-        >= 28 C  = kipas ON
-        <  28 C  = kipas OFF
-      */
+    if (kipasNyala) {
+      // Kipas sedang aktif: periksa apakah sudah menyala selama 5 menit (300.000 ms)
       if (
-          suhuDalam >=
-          SUHU_KIPAS_ON
+          sekarang -
+          waktuKipasMulai >=
+          DURASI_KIPAS_NYALA
       ) {
-        setKipas(true);
-      }
-      else {
         setKipas(false);
+        kipasSelesaiSiklus = true;
+
+        // Jika saat mati suhu sudah turun di bawah 34 C, langsung reset siklus
+        if (dhtDalamValid && suhuDalam < SUHU_KIPAS_ON) {
+          kipasSelesaiSiklus = false;
+        }
+      }
+    }
+
+    if (!kipasNyala) {
+      if (dhtDalamValid) {
+        if (suhuDalam < SUHU_KIPAS_ON) {
+          // Suhu berada di bawah 34 C: reset siklus agar siap menyala kembali saat menyentuh 34 C lagi
+          kipasSelesaiSiklus = false;
+        }
+        else if (suhuDalam >= SUHU_KIPAS_ON && !kipasSelesaiSiklus) {
+          // Suhu menyentuh ambang batas 34 C: nyalakan kipas selama 5 menit
+          setKipas(true);
+          waktuKipasMulai = sekarang;
+        }
       }
     }
   }
